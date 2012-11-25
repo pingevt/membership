@@ -1,0 +1,574 @@
+<?php
+
+/**
+ * @file
+ * Module for the cevents Entity - a starting point to create your own Entity
+ * and associated administration interface
+ */  
+
+
+/**
+ * Implement hook_entity_info().
+ *
+ * We define two entities here - the actual entity that will hold our domain
+ * specific information and an entity that holds information about the different
+ * types of entities. See here: http://drupal.org/node/977380 for a discussion on this
+ * choice.
+ */
+function cevents_entity_info() {
+  $return['cevents'] = array(
+    'label' => t('Event'),
+    // The entity class and controller class extend the classes provided by the
+    // Entity API
+    'entity class' => 'Cevents',
+    'controller class' => 'CeventsController',
+    'base table' => 'cevents',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+        'id' => 'cevents_id',
+        'bundle' => 'type',
+    ),
+    // Bundles are defined by the cevents types below
+    'bundles' => array(),
+    // Bundle keys tell the FieldAPI how to extract information from the bundle objects
+    'bundle keys' => array(
+      'bundle' => 'type',
+    ),
+    'label callback' => 'entity_class_label',
+    'uri callback' => 'entity_class_uri',
+    'creation callback' => 'cevents_create',
+    'access callback' => 'cevents_access',
+    'module' => 'cevents',
+    // The information below is used by the CeventsUIController (which extends the EntityDefaultUIController)
+    'admin ui' => array(
+      'path' => 'admin/content/ceventss',
+      'file' => 'cevents.admin.inc',
+      'controller class' => 'CeventsUIController',
+      'menu wildcard' => '%cevents',
+    ),
+  );
+
+  // The entity that holds information about the entity types	  
+  $return['cevents_type'] = array(
+    'label' => t('Cevents Type'),
+    'entity class' => 'CeventsType',
+    'controller class' => 'CeventsTypeController',
+    'base table' => 'cevents_type',
+    'fieldable' => FALSE,
+    'bundle of' => 'cevents',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'access callback' => 'cevents_type_access',
+    'module' => 'cevents',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/structure/cevents_types',
+      'file' => 'cevents_type.admin.inc',
+      'controller class' => 'CeventsTypeUIController',
+    ),
+  );
+
+  return $return;
+}
+
+
+/**
+ * Implements hook_entity_info_alter().
+ *
+ * We are adding the info about the cevents types via a hook to avoid a recursion
+ * issue as loading the cevents types requires the entity info as well.
+ *
+ * @todo This needs to be improved
+ */
+function cevents_entity_info_alter(&$entity_info) {
+  foreach (cevents_get_types() as $type => $info) {
+    $entity_info['cevents']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/cevents_types/manage/%cevents_type',
+        'real path' => 'admin/structure/cevents_types/manage/' . $type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer cevents types'),
+      ),
+    );
+  }
+}
+  
+
+/**
+ * Implements hook_permission().
+ */
+function cevents_permission() {
+  // We set up permisssions to manage entity types, manage all entities and the
+  // permissions for each individual entity
+  $permissions = array(
+    'administer cevents types' => array(
+      'title' => t('Administer cevents types'),
+      'description' => t('Create and delete fields for cevents types, and set their permissions.'),
+    ),
+    'administer ceventss' => array(
+      'title' => t('Administer ceventss'),
+      'description' => t('Edit and delete all ceventss'),
+    ),  
+  );
+  
+  //Generate permissions per cevents 
+  foreach (cevents_get_types() as $type) {
+    $type_name = check_plain($type->type);
+    $permissions += array(
+      "edit any $type_name cevents" => array(
+        'title' => t('%type_name: Edit any cevents', array('%type_name' => $type->label)),
+      ),
+      "view any $type_name cevents" => array(
+        'title' => t('%type_name: View any cevents', array('%type_name' => $type->label)),
+      ),
+    );
+  }
+  return $permissions;  
+}
+
+
+/**
+ * Determines whether the given user has access to a cevents.
+ *
+ * @param $op
+ *   The operation being performed. One of 'view', 'update', 'create', 'delete'
+ *   or just 'edit' (being the same as 'create' or 'update').
+ * @param $cevents
+ *   Optionally a cevents or a cevents type to check access for. If nothing is
+ *   given, access for all ceventss is determined.
+ * @param $account
+ *   The user to check for. Leave it to NULL to check for the global user.
+ * @return boolean
+ *   Whether access is allowed or not.
+ */
+function cevents_access($op, $cevents = NULL, $account = NULL) {
+  if (user_access('administer ceventss', $account)) {
+    return TRUE;
+  }
+  if (isset($cevents) && $type_name = $cevents->type) {
+    $op = ($op == 'view') ? 'view' : 'edit';
+    if (user_access("$op any $type_name cevents", $account)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+
+/**
+ * Access callback for the entity API.
+ */
+function cevents_type_access($op, $type = NULL, $account = NULL) {
+  return user_access('administer cevents types', $account);
+}
+
+
+/**
+ * Gets an array of all cevents types, keyed by the type name.
+ *
+ * @param $type_name
+ *   If set, the type with the given name is returned.
+ * @return CeventsType[]
+ *   Depending whether $type isset, an array of cevents types or a single one.
+ */
+function cevents_get_types($type_name = NULL) {
+  // entity_load will get the Entity controller for our cevents entity and call the load
+  // function of that object - we are loading entities by name here.
+  $types = entity_load_multiple_by_name('cevents_type', isset($type_name) ? array($type_name) : FALSE);
+  return isset($type_name) ? reset($types) : $types;
+}
+
+
+/**
+ * Menu argument loader; Load a cevents type by string.
+ *
+ * @param $type
+ *   The machine-readable name of a cevents type to load.
+ * @return
+ *   A cevents type array or FALSE if $type does not exist.
+ */
+function cevents_type_load($type) {
+  return cevents_get_types($type);
+}
+
+
+/**
+ * Fetch a cevents object. Make sure that the wildcard you choose 
+ * in the cevents entity definition fits the function name here.
+ *
+ * @param $cevents_id
+ *   Integer specifying the cevents id.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   A fully-loaded $cevents object or FALSE if it cannot be loaded.
+ *
+ * @see cevents_load_multiple()
+ */
+function cevents_load($cevents_id, $reset = FALSE) {
+  $ceventss = cevents_load_multiple(array($cevents_id), array(), $reset);
+  return reset($ceventss);
+}
+
+
+/**
+ * Load multiple ceventss based on certain conditions.
+ *
+ * @param $cevents_ids
+ *   An array of cevents IDs.
+ * @param $conditions
+ *   An array of conditions to match against the {cevents} table.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   An array of cevents objects, indexed by cevents_id.
+ *
+ * @see entity_load()
+ * @see cevents_load()
+ */
+function cevents_load_multiple($cevents_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('cevents', $cevents_ids, $conditions, $reset);
+}
+
+
+/**
+ * Deletes a cevents.
+ */
+function cevents_delete(Cevents $cevents) {
+  $cevents->delete();
+}
+
+
+/**
+ * Delete multiple ceventss.
+ *
+ * @param $cevents_ids
+ *   An array of cevents IDs.
+ */
+function cevents_delete_multiple(array $cevents_ids) {
+  entity_get_controller('cevents')->delete($cevents_ids);
+}
+
+
+/**
+ * Create a cevents object.
+ */
+function cevents_create($values = array()) {
+  return entity_get_controller('cevents')->create($values);
+}
+
+
+/**
+ * Saves a cevents to the database.
+ *
+ * @param $cevents
+ *   The cevents object.
+ */
+function cevents_save(Cevents $cevents) {
+  return $cevents->save();
+}
+
+
+/**
+ * Saves a cevents type to the db.
+ */
+function cevents_type_save(CeventsType $type) {
+  $type->save();
+}
+
+
+/**
+ * Deletes a cevents type from the db.
+ */
+function cevents_type_delete(CeventsType $type) {
+  $type->delete();
+}
+
+
+/**
+ * URI callback for ceventss
+ */
+function cevents_uri(Cevents $cevents){
+  return array(
+    'path' => 'cevents/' . $cevents->cevents_id,
+  );
+}
+
+
+/**
+ * Menu title callback for showing individual entities
+ */
+function cevents_page_title(Cevents $cevents){
+  return $cevents->date;
+}
+
+
+/**
+ * Sets up content to show an individual cevents
+ * @todo - get rid of drupal_set_title();
+ */
+function cevents_page_view($cevents, $view_mode = 'full') {    
+  $controller = entity_get_controller('cevents');  
+  $content = $controller->view(array($cevents->cevents_id => $cevents));
+  drupal_set_title($cevents->date);
+  return $content;
+}
+
+
+/**
+ * Implements hook_views_api().
+ */
+function cevents_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'cevents') . '/views',
+  );
+}
+
+
+/**
+ * Implement hook_theme().
+ */
+function cevents_theme() {
+  return array(
+    'cevents_add_list' => array(
+      'variables' => array('content' => array()),
+      'file' => 'cevents.admin.inc',
+    ),
+    'cevents' => array(
+      'render element' => 'elements',
+      'template' => 'cevents',
+    ),
+   'cevents_sample_data' => array(
+      'variables' => array('cevents_sample_data', 'cevents' => NULL),
+      'template' => 'cevents-sample-data',
+    ),
+
+
+  );
+}  
+
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function cevents_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+  // Add action link 'admin/structure/ceventss/add' on 'admin/structure/ceventss'.
+  if ($root_path == 'admin/content/ceventss') {
+    $item = menu_get_item('admin/content/ceventss/add');
+    if ($item['access']) {
+      $data['actions']['output'][] = array(
+        '#theme' => 'menu_local_action',
+        '#link' => $item,
+      );
+    }
+  }
+}
+
+
+/**
+ * The class used for cevents entities
+ */
+class Cevents extends Entity {
+  
+  public function __construct($values = array()) {
+    parent::__construct($values, 'cevents');
+  }
+
+  protected function defaultLabel() {
+    return $this->date;
+  }
+
+  protected function defaultUri() {
+    return array('path' => 'cevents/' . $this->cevents_id);
+  }
+  
+  
+}
+
+
+/**
+ * The class used for cevents type entities
+ */
+class CeventsType extends Entity {
+  
+  public $type;
+  public $label;
+  
+  public function __construct($values = array()) {
+    parent::__construct($values, 'cevents_type');
+  }
+  
+}
+
+
+/**
+ * The Controller for Cevents entities
+ */
+class CeventsController extends EntityAPIController {
+  public function __construct($entityType) {
+    parent::__construct($entityType);
+  }
+
+
+  /**
+   * Create a cevents - we first set up the values that are specific
+   * to our cevents schema but then also go through the EntityAPIController
+   * function.
+   * 
+   * @param $type
+   *   The machine-readable type of the cevents.
+   *
+   * @return
+   *   A cevents object with all default fields initialized.
+   */
+  public function create(array $values = array()) {
+    // Add values that are specific to our Cevents
+    $values += array( 
+      'cevents_id' => '',
+      'is_new' => TRUE,
+      'title' => '',
+      'created' => '',
+      'changed' => '',
+      'data' => '',
+    );
+    
+    $cevents = parent::create($values);
+    return $cevents;
+  }
+  
+  /**
+   * Overriding the buldContent function to add entity specific fields
+   */
+  public function buildContent($entity, $view_mode = 'full', $langcode = NULL, $content = array()) {
+    $content = parent::buildContent($entity, $view_mode, $langcode, $content);
+    $content['cevents_sample_data'] =  array(
+      '#markup' => theme('cevents_sample_data', array('cevents_sample_data' => check_plain($entity->data['sample_data']), 'cevents' => $entity)),
+    );
+
+    return $content;
+  }
+  
+}
+
+
+/**
+ * The Controller for Cevents entities
+ */
+class CeventsTypeController extends EntityAPIControllerExportable {
+  public function __construct($entityType) {
+    parent::__construct($entityType);
+  }
+  
+   /**
+   * Create a cevents type - we first set up the values that are specific
+   * to our cevents type schema but then also go through the EntityAPIController
+   * function.
+   * 
+   * @param $type
+   *   The machine-readable type of the cevents.
+   *
+   * @return
+   *   A cevents type object with all default fields initialized.
+   */
+  public function create(array $values = array()) {
+    // Add values that are specific to our Cevents
+    $values += array( 
+      'id' => '',
+      'is_new' => TRUE,
+      'data' => '',
+    );
+    $cevents_type = parent::create($values);
+    return $cevents_type;
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+/**
+ *  Implements hook_block_info()
+ */
+function cevents_block_info() {
+  $blocks = array();
+  
+  $blocks['three_month_summary'] = array(
+    'info' => t('3 Month Summary'),
+  );
+  
+  return $blocks;
+}
+
+/**
+ *  Implements hook_block_view()
+ */
+function cevents_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'three_month_summary':
+      $block['subject'] = t('Six Month Summary');
+      $block['content'] = _three_month_summary();
+      break;
+  }
+  
+  return $block;
+}
+
+function _three_month_summary() {
+  
+  $month = date('m');
+  $header = array('Month', 'Avg Attendance', 'Avg GF Giving', 'Total Giving');
+  $rows = array();
+//print '<pre>';  
+  for($i = $month-5; $i<= $month; $i++) {
+    $start = mktime(0, 0, 0, $i, 1);
+    $end = mktime(23, 59, 59, $i, date('t', mktime(0, 0, 0, $i, 1)));
+    
+    $query = new EntityFieldQuery();
+    $entities = $query->entityCondition('entity_type', 'cevents')
+                      ->propertyCondition('date', array($start, $end), 'BETWEEN')
+                      ->execute();   
+  
+    if(isset($entities['cevents'])) $events = entity_load('cevents', array_keys($entities['cevents']));
+    else $events = array();
+//print_r($events);
+    
+    $pop = 0;
+    $gf_giving = 0;
+    $gf_giving_avg = 0;
+    
+    
+    $count = 0;
+    foreach($events as $e) {
+      $pop += $e->field_adult_count['und'][0]['value'] + $e->field_kids_count['und'][0]['value'] + $e->field_nursery_prek_count['und'][0]['value'];
+      $gf_giving += $e->field_general_fund_amt['und'][0]['value'];
+      $count++;
+    }
+    
+    if($count != 0) { $pop = $pop / $count; $gf_giving_avg = $gf_giving / $count;}
+    
+    $rows[] = array(
+      date('M, Y', mktime(0, 0, 0, $i, 1)),
+      round($pop, 0),
+      '$'.round($gf_giving_avg, 2),
+      '$'.round($gf_giving, 2),
+    );
+    
+  }
+  
+  return theme('table', array('header' => $header, 'rows' => $rows));
+}

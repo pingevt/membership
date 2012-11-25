@@ -1,0 +1,6 @@
+name = 6:8 Member
+description = 6:8 Member Database functions
+core = 7.x
+package = Six:Eight
+
+version = 7.x-1.0

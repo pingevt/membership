@@ -1,0 +1,267 @@
+<?php
+/**
+ *  Implements hook_form_alter()
+ */
+function six8_member_form_alter(&$form, &$form_state, $form_id) {
+//print $form_id;
+
+  if($form_id == 'member_node_form') {
+    $form['field_volunteer_groups']['und']['#options'] = array(
+      'Counting Team' => array(
+        'Counter' => 'Counter',
+        'Depositor' => 'Depositor',
+      ),
+      'Elementary Kids' => array(
+        'Kids Teacher' => 'Kids Teacher',
+      ),
+      'Impressions' => array(
+        'Announcements' => 'Announcements',
+        'Coordinator' => 'Coordinator',
+        'Greeter - Floater' => 'Greeter - Floater',
+        'Greeter - Front Door' => 'Greeter - Front Door',
+        'Hospitality' => 'Hospitality',
+      ),
+      'Media' => array(
+        'Lights' => 'Lights',
+        'Slides' => 'Slides',
+        'Sound' => 'Sound',
+      ),
+      'Nursery' => array(
+        'Nursery Helper' => 'Nursery Helper',
+      ),
+      'Prayer' => array(
+        'Prayer Team Assistant' => 'Prayer Team Assistant',
+        'Prayer Team Leader' => 'Prayer Team Leader',
+        'Service Prayer Team' => 'Service Prayer Team',
+      ),
+      'PreK' => array(
+        'PreK Teacher' => 'PreK Teacher',
+      ),
+      'Set-up/Tear-down' => array(
+        'Kids Room/Front of House' => 'Kids Room/Front of House',
+        'Set-up Member' => 'Set-up Member',
+        'Set-up Team Leader' => 'Set-up Team Leader',
+      ),
+      'Worship Team' => array(
+        'Acoustic Guitar' => 'Acoustic Guitar',
+        'Bass Guitar' => 'Bass Guitar',
+        'Drums' => 'Drums',
+        'Electric Guitar' => 'Electric Guitar',
+        'Horn' => 'Horn',
+        'Keys' => 'Keys',
+        'Percussion' => 'Percussion',
+        'Piano' => 'Piano',
+        'Violin' => 'Violin',
+        'Vocals' => 'Vocals',
+        'Worship Leader' => 'Worship Leader',
+      ),
+    );
+  }
+}
+
+function six8_member_node_presave($node) {
+  if($node->type == 'member') {
+    $node->title = '';
+    $node->title .= ($node->field_name['und'][0]['title'] != '')? $node->field_name['und'][0]['title'].' ' : '';
+    $node->title .= $node->field_name['und'][0]['given'];
+    $node->title .= ($node->field_name['und'][0]['middle'] != '')? ' '. $node->field_name['und'][0]['middle'] : '';
+    $node->title .= ' '. $node->field_name['und'][0]['family'];
+    $node->title .= ($node->field_name['und'][0]['generational'] != '')? ' '. $node->field_name['und'][0]['generational'] : '';
+    $node->title .= ($node->field_name['und'][0]['credentials'] != '')? ' '. $node->field_name['und'][0]['credentials'] : '';
+
+    $node->pathauto_perform_alias = TRUE;
+  }
+}
+
+/**
+ * Implements hook_theme_registry_alter()
+**/
+function six8_member_theme_registry_alter(&$theme_registry) {
+  $mod_path = drupal_get_path('module', 'six8_member').'/templates';
+  $theme_registry_copy = $theme_registry;       // munge on a copy
+  _theme_process_registry($theme_registry_copy, 'phptemplate', 'theme_engine', 'six8_member', $mod_path);
+  $theme_registry += array_diff_key($theme_registry_copy, $theme_registry);
+  $hooks = array('node');
+  foreach ($hooks as $h) {
+    _six8_member_insert_after_first_element($theme_registry[$h]['theme paths'], $mod_path);
+  }
+}
+
+/**
+ * Helper function for re-ordering arrays (needed by theme_registry_alter)
+*/
+function _six8_member_insert_after_first_element(&$a, $element) {
+  if(is_array($a)) {
+    $first_element = array_shift($a);
+    array_unshift($a, $first_element, $element);
+  }
+}
+
+function six8_member_theme($existing, $type, $theme, $path) {
+  /*print '<pre>';
+  print_r($existing);
+  print_r($type);
+  print_r($theme);
+  print_r($path);
+
+  return array(
+    'node' => array(
+      'path' => $path.'/template',
+      'template' => 'node-member',
+      'type' => 'module',
+    ),
+  );
+  */
+  return array();
+}
+
+
+
+function six8_member_permission() {
+  return array(
+    'administer six8_member settings' => array(
+      'title' => t('Administer Six:Eight Member module'),
+      'description' => t('Perform administration tasks for Six:Eight Member.'),
+    ),
+  );
+}
+
+function six8_member_menu() {
+  $items = array();
+
+  $items['admin/config/sixeight'] = array(
+    'title' => 'Six:Eight',
+    'description' => 'Configure Six:Eight settings.',
+    'position' => 'right',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+  );
+
+  $items['admin/config/sixeight/sixeight_settings'] = array(
+    'title' => 'Six:Eight Settings',
+    'description' => 'Configure settings for Six:Eight',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sixeight_admin'),
+    'access arguments' => array('administer six8_member settings'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+
+  $items['admin/config/sixeight/sixeight_import_members'] = array(
+    'title' => 'Six:Eight Import Members',
+    'description' => 'Import Members for Six:Eight',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('six8_member_upload_members'),
+    'access arguments' => array('administer six8_member settings'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+
+
+
+  $items['admin/test'] = array(
+    'title' => 'Six:Eight Import Members',
+    'description' => 'Import Members for Six:Eight',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('six8_member_upload_members'),
+    'access arguments' => array('administer six8_member settings'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+
+  return $items;
+}
+
+function test() {
+
+}
+
+function sixeight_admin() {
+  $form = array();
+
+  return system_settings_form($form);
+}
+
+function six8_member_upload_members() {
+  $form = array();
+
+  $form['csv'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Shipping Report'),
+    '#description' => 'Uplaod a file without spaces in the name.',
+    '#upload_validators' => array('file_validate_extensions' => array('csv')),
+    '#upload_location' => 'public://members/uploads/',
+    '#required' => true,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#title' => 'CSV string',
+    '#value' => 'Import',
+  );
+
+  return $form;
+}
+
+function six8_member_upload_members_validate(&$form, &$form_state) {
+
+}
+
+function six8_member_upload_members_submit(&$form, &$form_state) {
+//ini_set('auto_detect_line_endings', 1);
+
+print '<pre>';
+//print_r($form_state);
+//print $form_state['values']['csv'];
+/*  $string =  $form_state['values']['csv'];
+  $string = str_replace('
+
+', '**', $string);
+print $string;
+  $csv = str_getcsv($string, ',', '"', '\\');
+
+print_r($csv);
+*/
+  $file = file_load($form_state['values']['csv']);
+
+  drupal_set_message('Importing file: ' . $file->filename);
+
+  list($scheme, $target) = explode('://', $file->uri, 2);
+  $path = str_replace('\\', '/', trim($target, '\/'));
+  $directory = variable_get('file_public_path', conf_path() . '/files');
+  $full_path =  DRUPAL_ROOT . base_path() . $directory . '/' . drupal_encode_path($path);
+
+  $arrResult = array();
+  $handle = fopen($full_path, "r");
+  if( $handle ) {
+    while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+      $arrResult[] = $data;
+    }
+    fclose($handle);
+  }
+
+//print_r($arrResult);
+$nodeex = node_load(7);
+print_r($nodeex);
+$entity = entity_load('field_collection_item', array(17));
+print_r($entity);
+print_r($arrResult[0]);
+  foreach($arrResult as $a) {
+    if($a[0] != 'Id') {
+print_r($a);
+      $node = new stdClass();
+      $node->type = 'member';
+      node_object_prepare($node);
+
+      $node->field_name['und'][0]['given'] = $a[1];
+      $node->field_name['und'][0]['family'] = $a[2];
+
+      if($a[3] != '') {
+        $something = entity_get_controller('field_collection_item')->create(array());
+print 'SOMETHING';
+print_r($something);
+      }
+print_r($node);
+die();
+    }
+  }
+
+die();
+}
