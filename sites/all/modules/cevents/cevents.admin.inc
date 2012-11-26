@@ -19,7 +19,7 @@ class CeventsUIController extends EntityDefaultUIController {
    * parent class hook_menu() is optimized for entity type administration.
    */
   public function hook_menu() {
-    
+
     $items = array();
     $id_count = count(explode('/', $this->path));
     $wildcard = isset($this->entityInfo['admin ui']['menu wildcard']) ? $this->entityInfo['admin ui']['menu wildcard'] : '%' . $this->entityType;
@@ -32,10 +32,10 @@ class CeventsUIController extends EntityDefaultUIController {
       'file path' => drupal_get_path('module', 'system'),
       'file' => 'system.admin.inc',
     );
-    
+
     // Change the overview menu type for the list of ceventss.
     $items[$this->path]['type'] = MENU_LOCAL_TASK;
-    
+
     // Change the add page menu to multiple types of entities
     $items[$this->path . '/add'] = array(
       'title' => 'Add a cevents',
@@ -49,7 +49,7 @@ class CeventsUIController extends EntityDefaultUIController {
       'file path' => drupal_get_path('module', $this->entityInfo['module'])
 
     );
-    
+
     // Add menu items to add each different type of entity.
     foreach (cevents_get_types() as $type) {
       $items[$this->path . '/add/' . $type->type] = array(
@@ -80,7 +80,7 @@ class CeventsUIController extends EntityDefaultUIController {
       'weight' => -10,
       'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
     );
-    
+
     $items[$this->path . '/cevents/' . $wildcard . '/delete'] = array(
       'title' => 'Delete',
       'page callback' => 'cevents_delete_form_wrapper',
@@ -93,7 +93,7 @@ class CeventsUIController extends EntityDefaultUIController {
       'file' => 'cevents.admin.inc',
       'file path' => drupal_get_path('module', $this->entityInfo['module'])
     );
-    
+
     // Menu item for viewing ceventss
     $items['cevents/' . $wildcard] = array(
       //'title' => 'Title',
@@ -107,12 +107,12 @@ class CeventsUIController extends EntityDefaultUIController {
     );
     return $items;
   }
-  
-  
+
+
   /**
    * Create the markup for the add Cevents Entities page within the class
    * so it can easily be extended/overriden.
-   */ 
+   */
   public function addPage() {
     $item = menu_get_item();
     $content = system_admin_menu_block($item);
@@ -120,11 +120,11 @@ class CeventsUIController extends EntityDefaultUIController {
     if (count($content) == 1) {
       $item = array_shift($content);
       drupal_goto($item['href']);
-    }    
-        
+    }
+
     return theme('cevents_add_list', array('content' => $content));
   }
-  
+
 }
 
 
@@ -165,7 +165,7 @@ function cevents_delete_form_wrapper($cevents) {
  *   The cevents object to edit or for a create form an empty cevents object
  *     with only a cevents type defined.
  */
-function cevents_edit_form($form, &$form_state, $cevents) {
+function cevents_edit_form($form, &$form_state, Cevents $cevents) {
   // Add the default field elements.
   $form['date'] = array(
     '#type' => 'date',
@@ -175,7 +175,7 @@ function cevents_edit_form($form, &$form_state, $cevents) {
     '#required' => TRUE,
     '#weight' => -5,
   );
-  
+
   $form['data']['#tree'] = TRUE;
 
   // Add the field related form elements.
@@ -201,7 +201,7 @@ function cevents_edit_form($form, &$form_state, $cevents) {
     '#value' => t('Save cevents'),
     '#submit' => $submit + array('cevents_edit_form_submit'),
   );
-  
+
   if (!empty($cevents->date)) {
     $form['actions']['delete'] = array(
       '#type' => 'submit',
@@ -224,7 +224,7 @@ function cevents_edit_form($form, &$form_state, $cevents) {
  */
 function cevents_edit_form_validate(&$form, &$form_state) {
   $cevents = $form_state['cevents'];
-  
+
   // Notify field widgets to validate their data.
   field_attach_form_validate('cevents', $cevents, $form, $form_state);
 }
@@ -232,32 +232,32 @@ function cevents_edit_form_validate(&$form, &$form_state) {
 
 /**
  * Form API submit callback for the cevents form.
- * 
+ *
  * @todo remove hard-coded link
  */
 function cevents_edit_form_submit(&$form, &$form_state) {
 
   $cevents = entity_ui_controller('cevents')->entityFormSubmitBuildEntity($form, $form_state);
   // Save the cevents and go back to the list of ceventss
-  
+
   // Add in created and changed times.
   if ($cevents->is_new = isset($cevents->is_new) ? $cevents->is_new : 0){
     $cevents->created = time();
   }
-  
+
   if(is_array($cevents->date)) {
     $cevents->date = mktime(0, 0, 0, $cevents->date['month'], $cevents->date['day'], $cevents->date['year']);
   }
 
   $cevents->changed = time();
-  
+
   $cevents->save();
   $form_state['redirect'] = 'admin/content/ceventss';
 }
 
 /**
  * Form API submit callback for the delete button.
- * 
+ *
  * @todo Remove hard-coded path
  */
 function cevents_form_submit_delete(&$form, &$form_state) {
@@ -286,7 +286,7 @@ function cevents_delete_form($form, &$form_state, $cevents) {
     t('Cancel'),
     'confirm'
   );
-  
+
   return $form;
 }
 

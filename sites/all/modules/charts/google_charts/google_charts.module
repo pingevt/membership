@@ -1,1 +1,3 @@
 <?php
+
+include_once(drupal_get_path('module', 'google_charts') . '/google_charts.hooks.inc');

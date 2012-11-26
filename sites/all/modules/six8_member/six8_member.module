@@ -160,9 +160,8 @@ function six8_member_menu() {
   $items['admin/test'] = array(
     'title' => 'Six:Eight Import Members',
     'description' => 'Import Members for Six:Eight',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('six8_member_upload_members'),
-    'access arguments' => array('administer six8_member settings'),
+    'page callback' => 'test',
+    'access callback' => TRUE,
     'type' => MENU_NORMAL_ITEM,
    );
 
@@ -170,7 +169,11 @@ function six8_member_menu() {
 }
 
 function test() {
+  print '<pre>';
 
+  print '</pre>';
+
+return _block_attendance_chart();
 }
 
 function sixeight_admin() {

@@ -9,13 +9,13 @@
 /**
  * Implements hook_views_data()
  */
-function cevents_views_data_alter(&$data) { 
+function cevents_views_data_alter(&$data) {
 //print '<pre>';
 //print_r($data['cevents']);
 //die();
-  
+
   $data['cevents']['date']['field']['handler'] = 'cevents_handler_date_field';
-  
+
   $data['cevents']['link_cevents'] = array(
     'field' => array(
       'title' => t('Link'),
@@ -56,18 +56,18 @@ function cevents_views_default_views() {
   $views = array();
 
   $view = new view;
-  $view->name = 'ceventss';
+  $view->name = 'cevents';
   $view->description = 'A list of all ceventss';
-  $view->tag = 'ceventss';
+  $view->tag = 'cevents';
   $view->base_table = 'cevents';
-  $view->human_name = 'Ceventss';
+  $view->human_name = 'Cevents';
   $view->core = 7;
   $view->api_version = '3.0-alpha1';
   $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
-  
+
   /* Display: Master */
   $handler = $view->new_display('default', 'Master', 'default');
-  $handler->display->display_options['title'] = 'Ceventss';
+  $handler->display->display_options['title'] = 'Cevents';
   $handler->display->display_options['access']['type'] = 'perm';
   $handler->display->display_options['access']['perm'] = 'create any cevents type';
   $handler->display->display_options['cache']['type'] = 'none';
@@ -104,7 +104,7 @@ function cevents_views_default_views() {
   $handler->display->display_options['empty']['area']['field'] = 'area';
   $handler->display->display_options['empty']['area']['label'] = 'Empty ';
   $handler->display->display_options['empty']['area']['empty'] = FALSE;
-  $handler->display->display_options['empty']['area']['content'] = 'No ceventss have been created yet';
+  $handler->display->display_options['empty']['area']['content'] = 'No cevents have been created yet';
   /* Field: Cevents: Cevents ID */
   $handler->display->display_options['fields']['cevents_id']['id'] = 'cevents_id';
   $handler->display->display_options['fields']['cevents_id']['table'] = 'cevents';
@@ -182,7 +182,7 @@ function cevents_views_default_views() {
   $handler->display->display_options['fields']['operations']['element_default_classes'] = 1;
   $handler->display->display_options['fields']['operations']['hide_empty'] = 0;
   $handler->display->display_options['fields']['operations']['empty_zero'] = 0;
-  
+
   /* Display: Page */
   $handler = $view->new_display('page', 'Page', 'ceventss_admin_page');
   $handler->display->display_options['path'] = 'admin/content/ceventss/list';
@@ -216,7 +216,7 @@ function cevents_views_default_views() {
     t('Operations links'),
     t('Page'),
   );
-  $views[] = $view;
+  $views['cevents'] = $view;
   return $views;
 
 }
