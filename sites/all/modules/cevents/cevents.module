@@ -554,7 +554,7 @@ function cevents_block_view($delta = '') {
 
   switch ($delta) {
     case 'three_month_summary':
-      $block['subject'] = t('Six month summary');
+      $block['subject'] = t('Twelve month summary');
       $block['content'] = _block_three_month_summary();
       break;
     case 'attendance_chart':
@@ -572,7 +572,7 @@ function _block_three_month_summary() {
   $header = array('Month', 'Avg Attendance', 'Avg GF Giving', 'Total Giving');
   $rows = array();
 //print '<pre>';
-  for($i = $month-5; $i<= $month; $i++) {
+  for($i = $month-12; $i<= $month; $i++) {
     $start = mktime(0, 0, 0, $i, 1);
     $end = mktime(23, 59, 59, $i, date('t', mktime(0, 0, 0, $i, 1)));
 
@@ -592,7 +592,10 @@ function _block_three_month_summary() {
 
     $count = 0;
     foreach($events as $e) {
-      $pop += $e->field_adult_count['und'][0]['value'] + $e->field_kids_count['und'][0]['value'] + $e->field_nursery_prek_count['und'][0]['value'];
+      if(isset($e->field_adult_count['und'][0]['value'] )) $pop += $e->field_adult_count['und'][0]['value'] ;
+      if(isset($e->field_kids_count['und'][0]['value'])) $pop += $e->field_kids_count['und'][0]['value'];
+      if(isset($e->field_nursery_prek_count['und'][0]['value'] )) $pop += $e->field_nursery_prek_count['und'][0]['value'] ;
+
       $gf_giving += $e->field_general_fund_amt['und'][0]['value'];
       $count++;
     }
