@@ -822,13 +822,15 @@ function _year_to_year_comparison() {
   $white = 'ffffff';
   $red = 'ff0000';
   $green = '008000';
+  $blue = '00aeef';
 
   foreach($years AS $i => $year) {
-    $string .= "\r\ndata.addColumn('number', '".$year." Avg Attendance');";
-    $string .= "\r\ndata.addColumn('number', '".$year." Avg Giving');";
+    $string .= "\r\ndata.addColumn('number', '".$year." Avg Att');";
+    $string .= "\r\ndata.addColumn('number', '".$year." Avg $');";
+    $string .= "\r\ndata.addColumn('number', '".$year." Total $');";
 
     $brightness = .25 + ($i / $number_of_years);
-    $series_string .= "{color: \"" . colourBrightness($red, $brightness) . "\", visibleInLegend: true}, {color: \"".colourBrightness($green, $brightness) . "\", visibleInLegend: true, targetAxisIndex: 1, type: 'line', pointSize: 4},";
+    $series_string .= "{color: \"" . colourBrightness($red, $brightness) . "\", visibleInLegend: true, type: 'line', pointSize: 4}, {color: \"".colourBrightness($green, $brightness) . "\", visibleInLegend: true, targetAxisIndex: 1 }, {color: \"".colourBrightness($blue, $brightness) . "\", visibleInLegend: true, targetAxisIndex: 1 },";
 
   }
 
@@ -838,9 +840,10 @@ function _year_to_year_comparison() {
     $string .= "\r\ndata.addRow(['". $mname ."', ";
 
     foreach ($years as $y) {
-      if (isset($events[$y][$m])) $string .= "". $events[$y][$m]['#data']['avg_attendance'] .", ". $events[$y][$m]['#data']['avg_giving'] .", ";
-      else $string .= "null, null, ";
+      if (isset($events[$y][$m])) $string .= "". $events[$y][$m]['#data']['avg_attendance'] .", ". $events[$y][$m]['#data']['avg_giving'] .", ". $events[$y][$m]['#data']['total_giving'] .",";
+      else $string .= "null, null, null, ";
     }
+
     $string = substr($string, 0, -2);
     $string .= ']);';
   }
@@ -849,8 +852,9 @@ function _year_to_year_comparison() {
 
   $string .= "\r\n\r\nvar options = {
           title: 'Year to Year Comparison',
+          titlePosition: 'out',
           legend: {
-            position: 'top',
+            position: 'bottom',
           },
           hAxis: {
             slantedText: 1,
@@ -867,7 +871,7 @@ function _year_to_year_comparison() {
   drupal_add_js('https://www.google.com/jsapi', array('type' => 'external', 'scope' => 'footer', 'weight' => 4));
   drupal_add_js($string, array('type' => 'inline', 'scope' => 'footer', 'weight' => 5));
 
-  return '<div id="chart_div_y-t-y" style="height: 300px;"></div>';
+  return '<div id="chart_div_y-t-y" style="height: 400px;"></div>';
 }
 
 
