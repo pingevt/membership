@@ -543,6 +543,10 @@ function cevents_block_info() {
     'info' => t('6 month attendance chart'),
   );
 
+  $blocks['year_comparison'] = array(
+    'info' => t('Year to Year Comparison'),
+  );
+
   return $blocks;
 }
 
@@ -560,6 +564,10 @@ function cevents_block_view($delta = '') {
     case 'attendance_chart':
       $block['subject'] = t('Six month attendance chart');
       $block['content'] = _block_attendance_chart();
+      break;
+    case 'year_comparison':
+      $block['subject'] = t('Year to Year Comparison');
+      $block['content'] = _year_to_year_comparison();
       break;
   }
 
@@ -727,4 +735,178 @@ function _block_attendance_chart() {
   drupal_add_js($string, array('type' => 'inline', 'scope' => 'footer', 'weight' => 5));
 //print '</pre>';
   return '<div id="chart_div" style="height: 300px;"></div><div><h3 style="text-align: center">Six month average: '. round($six_month_average, 2) .'</h3></div>';
+}
+
+function _year_to_year_comparison() {
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'cevents')
+                    ->propertyOrderBy('date', 'ASC')
+                    ->addMetaData('account', user_load(1))
+                    ->execute();
+
+  $results = array();
+  $sums = array(
+    'sumx' => 0,
+    'sumx2' => 0,
+    'sumy' => 0,
+    'sumx*y' => 0,
+
+    'g_sumy' => 0,
+    'g_sumx*y' => 0,
+  );
+
+  $events = array();
+
+  //sort $events into year and months
+  foreach ($entities['cevents'] as $ceid => $c) {
+    $e = cevents_load($c->cevents_id);
+    $events[date('Y', $e->date)][date('m', $e->date)][] = entity_metadata_wrapper('cevents', $e);
+  }
+
+  $number_of_years = count($events);
+
+  //calculate data
+  $years = array();
+  $months_a = array(
+    '01' => 'Jan',
+    '02' => 'Feb',
+    '03' => 'Mar',
+    '04' => 'Apr',
+    '05' => 'May',
+    '06' => 'Jun',
+    '07' => 'Jul',
+    '08' => 'Aug',
+    '09' => 'Sep',
+    '10' => 'Oct',
+    '11' => 'Nov',
+    '12' => 'Dec',
+  );
+
+  foreach ($events AS $year => $months) {
+    $years[] = $year;
+
+
+
+    foreach ($months as $month => $mes) {
+      $events[$year][$month]['#data'] = array(
+        'count' => 0,
+        'total_giving' => 0,
+        'total_attendance' => 0,
+        'avg_giving' => 0,
+        'avg_attendance' => 0,
+      );
+
+      foreach ($mes as $k => $e) {
+        $events[$year][$month]['#data']['count']++;
+        $events[$year][$month]['#data']['total_giving'] += $e->field_general_fund_amt->value();
+        $events[$year][$month]['#data']['total_attendance'] += $e->field_adult_count->value() + $e->field_kids_count->value() + $e->field_nursery_prek_count->value();
+      }
+
+      $events[$year][$month]['#data']['avg_giving'] = ($events[$year][$month]['#data']['count'] == 0 ) ? 0 : round(($events[$year][$month]['#data']['total_giving'] / $events[$year][$month]['#data']['count']), 2);
+      $events[$year][$month]['#data']['avg_attendance'] = ($events[$year][$month]['#data']['count'] == 0 ) ? 0 : round(($events[$year][$month]['#data']['total_attendance'] / $events[$year][$month]['#data']['count']), 2);
+    }
+  }
+  $string = '';
+
+  $string .= 'google.load("visualization", "1", {packages:["corechart"]});
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = new google.visualization.DataTable();
+
+        data.addColumn(\'string\', \'Month\');';
+
+  //build series options
+  //{color: \"red\", visibleInLegend: true}, {color: \"red\", visibleInLegend: true, targetAxisIndex: 1, type: 'line'}, {color: \"green\", visibleInLegend: true}, {color: \"green\", visibleInLegend: true, targetAxisIndex: 1, type: 'line'}
+  $series_string = '';
+
+  $white = 'ffffff';
+  $red = 'ff0000';
+  $green = '008000';
+
+  foreach($years AS $i => $year) {
+    $string .= "\r\ndata.addColumn('number', '".$year." Avg Attendance');";
+    $string .= "\r\ndata.addColumn('number', '".$year." Avg Giving');";
+
+    $brightness = .25 + ($i / $number_of_years);
+    $series_string .= "{color: \"" . colourBrightness($red, $brightness) . "\", visibleInLegend: true}, {color: \"".colourBrightness($green, $brightness) . "\", visibleInLegend: true, targetAxisIndex: 1, type: 'line', pointSize: 4},";
+
+  }
+
+
+
+  foreach ($months_a as $m => $mname) {
+    $string .= "\r\ndata.addRow(['". $mname ."', ";
+
+    foreach ($years as $y) {
+      if (isset($events[$y][$m])) $string .= "". $events[$y][$m]['#data']['avg_attendance'] .", ". $events[$y][$m]['#data']['avg_giving'] .", ";
+      else $string .= "null, null, ";
+    }
+    $string = substr($string, 0, -2);
+    $string .= ']);';
+  }
+
+
+
+  $string .= "\r\n\r\nvar options = {
+          title: 'Year to Year Comparison',
+          legend: {
+            position: 'top',
+          },
+          hAxis: {
+            slantedText: 1,
+            slantedTextAngle: 80
+          },
+          seriesType: 'bars',
+          series: [". $series_string ."],
+        };
+
+        var chart = new google.visualization.ComboChart(document.getElementById('chart_div_y-t-y'));
+        chart.draw(data, options);
+}";
+
+  drupal_add_js('https://www.google.com/jsapi', array('type' => 'external', 'scope' => 'footer', 'weight' => 4));
+  drupal_add_js($string, array('type' => 'inline', 'scope' => 'footer', 'weight' => 5));
+
+  return '<div id="chart_div_y-t-y" style="height: 300px;"></div>';
+}
+
+
+function colourBrightness($hex, $percent) {
+	// Work out if hash given
+	$hash = '';
+	if (stristr($hex,'#')) {
+		$hex = str_replace('#','',$hex);
+		$hash = '#';
+	}
+	/// HEX TO RGB
+	$rgb = array(hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2)));
+	//// CALCULATE
+	for ($i=0; $i<3; $i++) {
+		// See if brighter or darker
+		if ($percent > 0) {
+			// Lighter
+			$rgb[$i] = round($rgb[$i] * $percent) + round(255 * (1-$percent));
+		} else {
+			// Darker
+			$positivePercent = $percent - ($percent*2);
+			$rgb[$i] = round($rgb[$i] * $positivePercent) + round(0 * (1-$positivePercent));
+		}
+		// In case rounding up causes us to go to 256
+		if ($rgb[$i] > 255) {
+			$rgb[$i] = 255;
+		}
+	}
+	//// RBG to Hex
+	$hex = '';
+	for($i=0; $i < 3; $i++) {
+		// Convert the decimal digit to hex
+		$hexDigit = dechex($rgb[$i]);
+		// Add a leading zero if necessary
+		if(strlen($hexDigit) == 1) {
+		$hexDigit = "0" . $hexDigit;
+		}
+		// Append to the hex string
+		$hex .= $hexDigit;
+	}
+	return $hash.$hex;
 }
