@@ -632,6 +632,9 @@ function _block_attendance_chart() {
     'sumx2' => 0,
     'sumy' => 0,
     'sumx*y' => 0,
+
+    'g_sumy' => 0,
+    'g_sumx*y' => 0,
   );
 
   $c = 1;
@@ -639,15 +642,18 @@ function _block_attendance_chart() {
     $e = cevents_load($cid);
     $ew = entity_metadata_wrapper('cevents', $e);
 //print_r($e);
+//die();
 //print_r($ew);
 
     $count = $ew->field_adult_count->value() + $ew->field_nursery_prek_count->value() + $ew->field_kids_count->value();
-    $results[] = array('date' => date('m-d', $e->date), 'num'=>$count);
+    $results[] = array('date' => date('m-d', $e->date), 'num'=>$count, 'giving'=> $ew->field_general_fund_amt->value());
 
     $sums['sumx'] += $c;
     $sums['sumx2'] += $c*$c;
     $sums['sumy'] += $count;
     $sums['sumx*y'] += $count * $c;
+    $sums['g_sumy'] += $ew->field_general_fund_amt->value();
+    $sums['g_sumx*y'] += $ew->field_general_fund_amt->value() * $c;
 
     $c++;
   }
@@ -658,9 +664,17 @@ function _block_attendance_chart() {
   $a = ($sums['sumy'] / $c) - $b * ( $sums['sumx'] / $c);
 //print_r($sums);
 
+  $b2 = ($sums['g_sumx*y'] - $sums['sumx'] * $sums['g_sumy'] / $c) / ($sums['sumx2'] - $sums['sumx']*$sums['sumx']/ $c);
+  $a2 = ($sums['g_sumy'] / $c) - $b2 * ( $sums['sumx'] / $c);
+
   $trend_line = array();
   for($i=1; $i<= count($results); $i++) {
     $trend_line[$i] = $a + $b * $i;
+  }
+
+  $g_trend_line = array();
+  for($i=1; $i<= count($results); $i++) {
+    $g_trend_line[$i] = $a2 + $b2 * $i;
   }
 
   $six_month_average = $sums['sumy'] / $c;
@@ -670,19 +684,20 @@ function _block_attendance_chart() {
   $string .= 'google.load("visualization", "1", {packages:["corechart"]});
       google.setOnLoadCallback(drawChart);
       function drawChart() {
-        var data = google.visualization.arrayToDataTable([
-          [\'Date\', \'Trend\', \'Attendance\'],';
+        var data = new google.visualization.DataTable();
 
-  /*      [\'2004\',  1000],
-          [\'2005\',  1170],
-          [\'2006\',  660],
-          [\'2007\',  1030]
-  */
+        data.addColumn(\'string\', \'Date\');
+        data.addColumn(\'number\', \'Attend. Trend\');
+        data.addColumn({type: \'string\', role: \'tooltip\'});
+        data.addColumn(\'number\', \'Attend. Trend\');
+        data.addColumn(\'number\', \'Giving\');
+        data.addColumn(\'number\', \'Giving Trend\');
+        data.addRows([';
 
   $c = 1;
   foreach($results as $count => $r) {
     $string .= "
-          ['". $r['date'] ."', ". $trend_line[$c] .", ". $r['num'] ."]";
+          ['". $r['date'] ."', ". $trend_line[$c] .", '', ". $r['num'] .", ". $r['giving'] .", ". $g_trend_line[$c] ."]";
 
     if($count + 1 != count($results)) $string .= ',';
 
@@ -701,7 +716,7 @@ function _block_attendance_chart() {
             slantedText: 1,
             slantedTextAngle: 80
           },
-          series: [{color: "#ccc", visibleInLegend: false}, {color: "red", visibleInLegend: true}],
+          series: [{color: "#cca3a3", visibleInLegend: false}, {color: "red", visibleInLegend: true}, {color: "green", visibleInLegend: true, targetAxisIndex: 1}, {color: "#a3cca3", visibleInLegend: false, targetAxisIndex: 1}],
         };
 
         var chart = new google.visualization.LineChart(document.getElementById(\'chart_div\'));
